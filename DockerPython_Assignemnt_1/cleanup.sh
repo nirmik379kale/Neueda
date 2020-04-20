@@ -12,6 +12,7 @@ printf "\n\n# Removing images for sender, receiver and rabbitmq:management...\n"
 docker rmi sender:latest
 docker rmi receiver:latest
 docker rmi rabbitmq:management
+docker rmi python:3.7.5-alpine
 
 printf "\n\n# Removing docker name bridge-nw...\n"
 docker network rm bridge-nw
