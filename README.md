@@ -15,4 +15,4 @@ git clone https://github.com/nirmik379kale/Neueda.git
 cd neueda-assignment/
 ```
 
-Once your moved to the repo directory, you will the above mentioned subdirectories. Please cd to the desired one and read the README.md for instructions.
+Once you have moved to the repo directory, you will see the above mentioned subdirectories. Please cd to the desired one and read the README.md for instructions.
