@@ -1,9 +1,7 @@
-#Container2Container File Transfer
-
 - This repository contains the solution for both assignments provided as assessment.
 - The assignments are structured as follows : 
     1. DockerPython_Assignment_1 `[ Container to Container Encrypted File Transfer ]`
-    2. OpenStackAnsible_Assignment_2 `[ Instance Migration and Evacuation from Fauly Node ]`
+    2. OpenStackAnsible_Assignment_2 `[ Instance Migration and Evacuation from Compute Node ]`
     
 - Each subdirectory contains its own README.md that details how to execute the specific project.
 
