@@ -12,7 +12,7 @@ You'll need to clone this repository first to execute both projects. Follow the 
 
 ```
 git clone https://github.com/nirmik379kale/Neueda.git
-cd Neueda/
+cd neueda-assignment/
 ```
 
 Once your moved to the repo directory, you will the above mentioned subdirectories. Please cd to the desired one and read the README.md for instructions.
