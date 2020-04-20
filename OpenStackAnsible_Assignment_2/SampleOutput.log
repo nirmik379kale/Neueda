@@ -1,0 +1,165 @@
+[root@os-controller os-migrate]# openstack server list --host openstack-compute-02.us-reg01
++--------------------------------------+-----------------+---------+---------------------------------------------+---------+----------+
+| ID                                   | Name            | Status  | Networks                                    | Image   | Flavor   |
++--------------------------------------+-----------------+---------+---------------------------------------------+---------+----------+
+| d43cc181-59a4-40ee-a770-c78884dade28 | test-vm2-centos | ACTIVE  | internal_network=10.10.0.1                  | Centos7 | m1.small |
+| 17029ff8-f1df-4379-949b-67c0abd7a6f4 | test-vm-centos  | SHUTOFF | internal_network=10.10.0.2                  | Centos7 | m1.small |
++--------------------------------------+-----------------+---------+---------------------------------------------+---------+----------+
+[root@os-controller os-migrate]# ansible-playbook os-migrate.yaml
+
+PLAY [Openstack Instance Migration and Host Evacuation] ***************************************************************************************************************************
+
+TASK [Gathering Facts] ************************************************************************************************************************************************************
+ok: [127.0.0.1]
+
+TASK [Getting list of RUNNING instances on openstack-compute-02.us-reg01] *********************************************************************************************************
+changed: [127.0.0.1]
+
+TASK [RUNNING Server list on host openstack-compute-02.us-reg01] ******************************************************************************************************************
+ok: [127.0.0.1] => {
+    "msg": {
+        "changed": true,
+        "cmd": "openstack --insecure server list --host openstack-compute-02.us-reg01 --format value -c ID --status ACTIVE | awk '{printf \"%s,\", $1 }' | head -c -1",
+        "delta": "0:00:02.710256",
+        "end": "2020-04-19 21:09:25.728104",
+        "failed": false,
+        "rc": 0,
+        "start": "2020-04-19 21:09:23.017848",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "d43cc181-59a4-40ee-a770-c78884dade28",
+        "stdout_lines": [
+            "d43cc181-59a4-40ee-a770-c78884dade28"
+        ]
+    }
+}
+
+TASK [Live migrating RUNNING instances to other available host] *******************************************************************************************************************
+changed: [127.0.0.1] => (item=d43cc181-59a4-40ee-a770-c78884dade28)
+
+TASK [Live migration debug logs] **************************************************************************************************************************************************
+ok: [127.0.0.1] => {
+    "msg": {
+        "changed": true,
+        "msg": "All items completed",
+        "results": [
+            {
+                "ansible_loop_var": "item",
+                "changed": true,
+                "cmd": "openstack --insecure server migrate --live-migration --wait d43cc181-59a4-40ee-a770-c78884dade28",
+                "delta": "0:00:14.275435",
+                "end": "2020-04-19 21:09:40.620774",
+                "failed": false,
+                "invocation": {
+                    "module_args": {
+                        "_raw_params": "openstack --insecure server migrate --live-migration --wait d43cc181-59a4-40ee-a770-c78884dade28",
+                        "_uses_shell": true,
+                        "argv": null,
+                        "chdir": null,
+                        "creates": null,
+                        "executable": null,
+                        "removes": null,
+                        "stdin": null,
+                        "stdin_add_newline": true,
+                        "strip_empty_ends": true,
+                        "warn": true
+                    }
+                },
+                "item": "d43cc181-59a4-40ee-a770-c78884dade28",
+                "rc": 0,
+                "start": "2020-04-19 21:09:26.345339",
+                "stderr": "",
+                "stderr_lines": [],
+                "stdout": "Complete",
+                "stdout_lines": [
+                    "Complete"
+                ]
+            }
+        ]
+    }
+}
+
+TASK [Getting list of NON-RUNNING instances on openstack-compute-02.us-reg01] *****************************************************************************************************
+changed: [127.0.0.1]
+
+TASK [NON-RUNNING Server list on host openstack-compute-02.us-reg01] **************************************************************************************************************
+ok: [127.0.0.1] => {
+    "msg": {
+        "changed": true,
+        "cmd": "openstack --insecure server list --host openstack-compute-02.us-reg01 --format value -c ID --status SHUTOFF | awk '{printf \"%s,\", $1 }' | head -c -1",
+        "delta": "0:00:02.747513",
+        "end": "2020-04-19 21:09:43.922143",
+        "failed": false,
+        "rc": 0,
+        "start": "2020-04-19 21:09:41.174630",
+        "stderr": "",
+        "stderr_lines": [],
+        "stdout": "17029ff8-f1df-4379-949b-67c0abd7a6f4",
+        "stdout_lines": [
+            "17029ff8-f1df-4379-949b-67c0abd7a6f4"
+        ]
+    }
+}
+
+TASK [Cold migrating NON-RUNNING instances to other available host] ***************************************************************************************************************
+changed: [127.0.0.1] => (item=17029ff8-f1df-4379-949b-67c0abd7a6f4)
+
+TASK [Cold Migration Debug logs] **************************************************************************************************************************************************
+ok: [127.0.0.1] => {
+    "msg": {
+        "changed": true,
+        "msg": "All items completed",
+        "results": [
+            {
+                "ansible_loop_var": "item",
+                "changed": true,
+                "cmd": "openstack --insecure server migrate --wait 17029ff8-f1df-4379-949b-67c0abd7a6f4\necho \"17029ff8-f1df-4379-949b-67c0abd7a6f4 migration started..\"\nVM_STATUS=$(openstack --insecure server show 17029ff8-f1df-4379-949b-67c0abd7a6f4 | grep status | awk '{print $4}')\nwhile [[ \"$VM_STATUS\" != \"VERIFY_RESIZE\" ]]; do\n  sleep 2\n  VM_STATUS=$(openstack --insecure server show 17029ff8-f1df-4379-949b-67c0abd7a6f4 | grep status | awk '{print $4}')\ndone\nopenstack --insecure server resize --confirm --wait 17029ff8-f1df-4379-949b-67c0abd7a6f4\necho \"17029ff8-f1df-4379-949b-67c0abd7a6f4 Migrated!\"\n",
+                "delta": "0:00:19.231435",
+                "end": "2020-04-19 21:10:03.738425",
+                "failed": false,
+                "invocation": {
+                    "module_args": {
+                        "_raw_params": "openstack --insecure server migrate --wait 17029ff8-f1df-4379-949b-67c0abd7a6f4\necho \"17029ff8-f1df-4379-949b-67c0abd7a6f4 migration started..\"\nVM_STATUS=$(openstack --insecure server show 17029ff8-f1df-4379-949b-67c0abd7a6f4 | grep status | awk '{print $4}')\nwhile [[ \"$VM_STATUS\" != \"VERIFY_RESIZE\" ]]; do\n  sleep 2\n  VM_STATUS=$(openstack --insecure server show 17029ff8-f1df-4379-949b-67c0abd7a6f4 | grep status | awk '{print $4}')\ndone\nopenstack --insecure server resize --confirm --wait 17029ff8-f1df-4379-949b-67c0abd7a6f4\necho \"17029ff8-f1df-4379-949b-67c0abd7a6f4 Migrated!\"\n",
+                        "_uses_shell": true,
+                        "argv": null,
+                        "chdir": null,
+                        "creates": null,
+                        "executable": null,
+                        "removes": null,
+                        "stdin": null,
+                        "stdin_add_newline": true,
+                        "strip_empty_ends": true,
+                        "warn": true
+                    }
+                },
+                "item": "17029ff8-f1df-4379-949b-67c0abd7a6f4",
+                "rc": 0,
+                "start": "2020-04-19 21:09:44.506990",
+                "stderr": "",
+                "stderr_lines": [],
+                "stdout": "Complete\n17029ff8-f1df-4379-949b-67c0abd7a6f4 migration started..\n17029ff8-f1df-4379-949b-67c0abd7a6f4 Migrated!",
+                "stdout_lines": [
+                    "Complete",
+                    "17029ff8-f1df-4379-949b-67c0abd7a6f4 migration started..",
+                    "17029ff8-f1df-4379-949b-67c0abd7a6f4 Migrated!"
+                ]
+            }
+        ]
+    }
+}
+
+TASK [Evacuate openstack-compute-02.us-reg01 compute] *****************************************************************************************************************************
+skipping: [127.0.0.1]
+
+TASK [Evacuate compute log] *******************************************************************************************************************************************************
+skipping: [127.0.0.1]
+
+TASK [Disabling openstack-compute-02.us-reg01 from compute scheduler] *************************************************************************************************************
+skipping: [127.0.0.1]
+
+PLAY RECAP ************************************************************************************************************************************************************************
+127.0.0.1                  : ok=9    changed=4    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0
+
+[root@os-controller os-migrate]# openstack server list --host openstack-compute-02.us-reg01
+
+[root@os-controller os-migrate]#
