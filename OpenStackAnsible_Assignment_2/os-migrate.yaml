@@ -1,0 +1,106 @@
+---
+- name: Openstack Instance Migration and Host Evacuation
+  hosts: localhost
+  become: yes
+  become_user: root
+  vars:
+    src_host: "{{ source_host }}"
+    migration_strat: "{{ migration_strategy | default('migrate')}}" #Expected values: migrate/evacuate
+    disable_src_host: "{{ disable_source_host | default(false) }}"
+  tasks:
+    - name: Getting list of RUNNING instances on {{ src_host }}
+      shell: openstack --insecure server list --host {{ src_host }} --format value -c ID --status ACTIVE | awk '{printf "%s,", $1 }' | head -c -1
+      register: running_instances_result
+      environment:
+        - OS_AUTH_URL: "{{ lookup('env', 'OS_AUTH_URL') }}"
+        - OS_PROJECT_ID: "{{ lookup('env', 'OS_PROJECT_ID') }}"
+        - OS_USER_DOMAIN_NAME: "{{ lookup('env', 'OS_USER_DOMAIN_NAME') }}"
+        - OS_USERNAME: "{{ lookup('env', 'OS_USERNAME') }}"
+        - OS_PASSWORD: "{{ lookup('env', 'OS_PASSWORD') }}"
+
+    - name: RUNNING Server list on host {{ src_host }}
+      debug:
+        msg: "{{ running_instances_result }}"
+
+    - name: Live migrating RUNNING instances to other available host
+      shell: openstack --insecure server migrate --live-migration --wait {{ item }}
+      register: live_migration_result
+      with_items: "{{ running_instances_result.stdout.split(',') }}"
+      environment:
+        - OS_AUTH_URL: "{{ lookup('env', 'OS_AUTH_URL') }}"
+        - OS_PROJECT_ID: "{{ lookup('env', 'OS_PROJECT_ID') }}"
+        - OS_USER_DOMAIN_NAME: "{{ lookup('env', 'OS_USER_DOMAIN_NAME') }}"
+        - OS_USERNAME: "{{ lookup('env', 'OS_USERNAME') }}"
+        - OS_PASSWORD: "{{ lookup('env', 'OS_PASSWORD') }}"
+  
+    - name: Live migration debug logs
+      debug:
+        msg: "{{ live_migration_result }}"
+
+    - name: Getting list of NON-RUNNING instances on {{ src_host }}
+      shell: openstack --insecure server list --host {{ src_host }} --format value -c ID --status SHUTOFF | awk '{printf "%s,", $1 }' | head -c -1
+      register: offline_instances_result
+      environment:
+        - OS_AUTH_URL: "{{ lookup('env', 'OS_AUTH_URL') }}"
+        - OS_PROJECT_ID: "{{ lookup('env', 'OS_PROJECT_ID') }}"
+        - OS_USER_DOMAIN_NAME: "{{ lookup('env', 'OS_USER_DOMAIN_NAME') }}"
+        - OS_USERNAME: "{{ lookup('env', 'OS_USERNAME') }}"
+        - OS_PASSWORD: "{{ lookup('env', 'OS_PASSWORD') }}"
+      when: migration_strat == "migrate"
+
+    - name: NON-RUNNING Server list on host {{ src_host }}
+      debug:
+        msg: "{{ offline_instances_result }}"
+      when: migration_strat == "migrate"
+
+    - name: Cold migrating NON-RUNNING instances to other available host
+      shell: |
+        echo "{{ item }} migration started"
+        openstack --insecure server migrate --wait {{ item }}
+        VM_STATUS=$(openstack --insecure server show {{ item }} | grep status | awk '{print $4}')
+        while [[ "$VM_STATUS" != "VERIFY_RESIZE" ]]; do
+          sleep 2
+          VM_STATUS=$(openstack --insecure server show {{ item }} | grep status | awk '{print $4}')
+        done
+        openstack --insecure server resize --confirm --wait {{ item }}
+        echo "{{ item }} Migrated!"
+      register: cold_migration_result
+      with_items: "{{ offline_instances_result.stdout.split(',') }}"
+      environment:
+        - OS_AUTH_URL: "{{ lookup('env', 'OS_AUTH_URL') }}"
+        - OS_PROJECT_ID: "{{ lookup('env', 'OS_PROJECT_ID') }}"
+        - OS_USER_DOMAIN_NAME: "{{ lookup('env', 'OS_USER_DOMAIN_NAME') }}"
+        - OS_USERNAME: "{{ lookup('env', 'OS_USERNAME') }}"
+        - OS_PASSWORD: "{{ lookup('env', 'OS_PASSWORD') }}"
+      when: migration_strat == "migrate"
+        
+    - name: Cold Migration Debug logs
+      debug:
+        msg: "{{ cold_migration_result }}"
+      when: migration_strat == "migrate"
+
+    - name: Evacuate {{ src_host }} compute
+      shell: nova --insecure host-evacuate {{ src_host }}
+      register: evacuate_result
+      environment:
+        - OS_AUTH_URL: "{{ lookup('env', 'OS_AUTH_URL') }}"
+        - OS_PROJECT_ID: "{{ lookup('env', 'OS_PROJECT_ID') }}"
+        - OS_USER_DOMAIN_NAME: "{{ lookup('env', 'OS_USER_DOMAIN_NAME') }}"
+        - OS_USERNAME: "{{ lookup('env', 'OS_USERNAME') }}"
+        - OS_PASSWORD: "{{ lookup('env', 'OS_PASSWORD') }}"
+      when: migration_strat == "evacuate"
+
+    - name: Evacuate compute log
+      debug:
+        msg: "{{ evacuate_result }}"
+      when: migration_strat == "evacuate"
+      
+    - name: Disabling {{ src_host }} from compute scheduler
+      shell: openstack --insecure host set --disable {{ src_host }}
+      environment:
+        - OS_AUTH_URL: "{{ lookup('env', 'OS_AUTH_URL') }}"
+        - OS_PROJECT_ID: "{{ lookup('env', 'OS_PROJECT_ID') }}"
+        - OS_USER_DOMAIN_NAME: "{{ lookup('env', 'OS_USER_DOMAIN_NAME') }}"
+        - OS_USERNAME: "{{ lookup('env', 'OS_USERNAME') }}"
+        - OS_PASSWORD: "{{ lookup('env', 'OS_PASSWORD') }}"
+      when: disable_src_host == true
